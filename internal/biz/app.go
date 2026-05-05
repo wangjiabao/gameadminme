@@ -6068,7 +6068,7 @@ func (ac *AppUsecase) AdminSetQueue(ctx context.Context, req *pb.AdminLandReward
 	stakeRecords, err = ac.userRepo.GetStakeGitRecordsQueue(ctx)
 
 	for _, v := range stakeRecords {
-		if queueAmount > v.AmountThree {
+		if queueAmount < v.AmountThree {
 			break
 		}
 		if err = ac.tx.ExecTx(ctx, func(ctx context.Context) error { // 事务
