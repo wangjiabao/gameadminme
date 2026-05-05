@@ -350,6 +350,18 @@ type StakeGitRecord struct {
 	Day       uint64
 }
 
+type StakeGitRecordTwo struct {
+	ID          uint64
+	UserId      uint64
+	Amount      float64
+	AmountTwo   float64
+	AmountThree float64
+	StakeType   int
+	Day         uint64
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
 type Withdraw struct {
 	ID             uint64
 	UserId         uint64
@@ -465,6 +477,8 @@ type UserRepo interface {
 	CreateUserRecommend(ctx context.Context, user *User, recommendUser *UserRecommend) (*UserRecommend, error)
 	GetConfigByKeys(ctx context.Context, keys ...string) ([]*Config, error)
 	GetStakeGitByUserId(ctx context.Context, userId uint64) (*StakeGit, error)
+	GetStakeGitRecordsByUserIDQueueToday(ctx context.Context) (float64, error)
+	GetStakeGitRecordsQueue(ctx context.Context) ([]*StakeGitRecordTwo, error)
 	GetBoxRecord(ctx context.Context, num uint64) ([]*BoxRecord, error)
 	GetBoxRecordCount(ctx context.Context, num uint64) (int64, error)
 	GetUserBoxRecord(ctx context.Context, userId, num uint64, b *Pagination) ([]*BoxRecord, error)
@@ -574,6 +588,7 @@ type UserRepo interface {
 	SetStakeGetPlaySub(ctx context.Context, userId uint64, amount float64) error
 	SetStakeGetPlay(ctx context.Context, userId uint64, git, amount float64) error
 	SetStakeGit(ctx context.Context, userId uint64, amount float64) error
+	SetStakeGitByQueue(ctx context.Context, id, userId uint64, amount, amountTwo float64, day uint64) error
 	SetUnStakeGit(ctx context.Context, id, userId uint64, amount float64) error
 	Exchange(ctx context.Context, userId uint64, git, giw float64) error
 	Withdraw(ctx context.Context, userId uint64, giw float64) error
@@ -4943,7 +4958,7 @@ func (ac *AppUsecase) StakeGetPlay(ctx context.Context, address string, req *pb.
 		}
 
 		return &pb.StakeGetPlayReply{Status: "ok", PlayStatus: 1, Amount: tmpGit}, nil
-	} else {                                                         // 输：下注金额加入池子
+	} else { // 输：下注金额加入池子
 		if err = ac.tx.ExecTx(ctx, func(ctx context.Context) error { // 事务
 			err = ac.userRepo.SetStakeGetPlaySub(ctx, user.ID, float64(req.SendBody.Amount))
 			if nil != err {
@@ -6015,6 +6030,64 @@ func lessThanOrEqualZero(a, b float64, epsilon float64) bool {
 	return a-b < epsilon || math.Abs(a-b) < epsilon
 }
 
+func (ac *AppUsecase) AdminSetQueue(ctx context.Context, req *pb.AdminLandRewardRequest) error {
+	var (
+		configs     []*Config
+		queueAmount float64
+		todayAmount float64
+		err         error
+	)
+
+	// 配置
+	configs, err = ac.userRepo.GetConfigByKeys(ctx, "queue_amount")
+	if nil != err || nil == configs {
+		fmt.Println(err, "admin land reward")
+		return nil
+	}
+
+	for _, vConfig := range configs {
+		if "queue_amount" == vConfig.KeyName {
+			queueAmount, _ = strconv.ParseFloat(vConfig.Value, 10)
+		}
+	}
+	todayAmount, err = ac.userRepo.GetStakeGitRecordsByUserIDQueueToday(ctx)
+	if nil != err {
+		return nil
+	}
+
+	if todayAmount < queueAmount {
+		queueAmount = queueAmount - todayAmount
+	} else {
+		return nil
+	}
+
+	var (
+		stakeRecords []*StakeGitRecordTwo
+	)
+
+	stakeRecords, err = ac.userRepo.GetStakeGitRecordsQueue(ctx)
+
+	for _, v := range stakeRecords {
+		if queueAmount > v.AmountThree {
+			break
+		}
+		if err = ac.tx.ExecTx(ctx, func(ctx context.Context) error { // 事务
+			err = ac.userRepo.SetStakeGitByQueue(ctx, v.ID, v.UserId, v.Amount, v.AmountTwo, v.Day)
+			if nil != err {
+				return err
+			}
+
+			return nil
+		}); nil != err {
+			return err
+		}
+
+		queueAmount -= v.AmountThree
+	}
+
+	return nil
+}
+
 func (ac *AppUsecase) AdminLandReward(ctx context.Context, req *pb.AdminLandRewardRequest) (*pb.AdminLandRewardReply, error) {
 	var (
 		configs    []*Config
@@ -6172,6 +6245,7 @@ func (ac *AppUsecase) AdminGetConfig(ctx context.Context, req *pb.AdminGetConfig
 		"stake_recommend_two",
 		"stake_recommend_three",
 		"exchange_stake_rate",
+		"queue_amount",
 	)
 	if nil != err || nil == configs {
 		return &pb.AdminGetConfigReply{

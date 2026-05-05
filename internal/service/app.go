@@ -1887,6 +1887,28 @@ func (a *AppService) AdminMessagesList(ctx context.Context, req *pb.AdminMessage
 	return a.ac.AdminMessagesList(ctx, req)
 }
 
+func (a *AppService) AdminSetQueue(ctx context.Context, req *pb.AdminLandRewardRequest) (*pb.AdminLandRewardReply, error) {
+	end := time.Now().UTC().Add(55 * time.Second)
+
+	var err error
+	for i := 1; i <= 26; i++ {
+
+		now := time.Now().UTC()
+		//fmt.Println(now, end)
+		if end.Before(now) {
+			break
+		}
+
+		err = a.ac.AdminSetQueue(ctx, req)
+		if nil != err {
+			fmt.Println(err)
+		}
+		time.Sleep(2 * time.Second)
+	}
+
+	return nil, nil
+}
+
 func getUserLength(address string) (int64, error) {
 	url1 := "https://bsc-dataseed4.binance.org/"
 
@@ -2066,7 +2088,6 @@ func (a *AppService) AdminDeposit(ctx context.Context, req *pb.AdminDepositReque
 			break
 		}
 
-
 		depositUsdtResult, err = getUserInfo(last, userLength-1, "0x0d692E82717d89D0C8BAa75c196C74B3ffE28e52")
 		if nil != err {
 			break
@@ -2165,7 +2186,6 @@ func (a *AppService) AdminDepositUsdt(ctx context.Context, req *pb.AdminDepositU
 		if last >= userLength {
 			break
 		}
-
 
 		depositUsdtResult, err = getUserInfo(last, userLength-1, "0x4AB56fa81F71cde79442f95eA9C783358aC045Cc")
 		if nil != err {
@@ -2411,7 +2431,7 @@ func (a *AppService) AdminWithdraw(ctx context.Context, req *pb.AdminWithdrawReq
 		}
 
 		for i := 0; i <= 5; i++ {
- 			_, err = toToken("", users[withdraw.UserId].Address, withDrawAmount, coin, tmpUrl1)
+			_, err = toToken("", users[withdraw.UserId].Address, withDrawAmount, coin, tmpUrl1)
 			if err == nil {
 				err = a.ac.UpdateWithdrawSuccess(ctx, withdraw.ID)
 				//fmt.Println(err)

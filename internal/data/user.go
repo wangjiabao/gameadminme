@@ -310,10 +310,23 @@ type StakeGit struct {
 	UpdatedAt time.Time `gorm:"type:datetime;not null"`
 }
 
+type StakeGitRecordTwo struct {
+	ID          uint64    `gorm:"primarykey;type:int"`
+	UserId      uint64    `gorm:"type:int;not null;comment:用户id"`
+	Amount      float64   `gorm:"type:decimal(65,18);not null;default:0.0;comment:金额"`
+	AmountTwo   float64   `gorm:"type:decimal(65,18);not null;default:0.0;comment:金额"`
+	AmountThree float64   `gorm:"type:decimal(65,18);not null;default:0.0;comment:金额"`
+	StakeType   int       `gorm:"type:int;not null;default:0;comment:操作类型：1质押，2解压"`
+	CreatedAt   time.Time `gorm:"type:datetime;not null"`
+	UpdatedAt   time.Time `gorm:"type:datetime;not null"`
+	Day         uint64    `gorm:"type:int;not null;"`
+}
+
 type StakeGitRecord struct {
 	ID        uint64    `gorm:"primarykey;type:int"`
 	UserId    uint64    `gorm:"type:int;not null;comment:用户id"`
 	Amount    float64   `gorm:"type:decimal(65,18);not null;default:0.0;comment:金额"`
+	AmountTwo float64   `gorm:"type:decimal(65,18);not null;default:0.0;comment:金额"`
 	StakeType int       `gorm:"type:int;not null;default:0;comment:操作类型：1质押，2解压"`
 	CreatedAt time.Time `gorm:"type:datetime;not null"`
 	UpdatedAt time.Time `gorm:"type:datetime;not null"`
@@ -1241,6 +1254,51 @@ func (u *UserRepo) GetConfigByKeys(ctx context.Context, keys ...string) ([]*biz.
 			KeyName: config.KeyName,
 			Name:    config.Name,
 			Value:   config.Value,
+		})
+	}
+
+	return res, nil
+}
+
+func (u *UserRepo) GetStakeGitRecordsByUserIDQueueToday(ctx context.Context) (float64, error) {
+	var totalStakeRate float64
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+	if err := u.data.DB(ctx).Table("stake_git_record_ispay_queue").Where("stake_type=?", 2).Where("created_at>=?", todayStart).Select("SUM(amount_three)").Scan(&totalStakeRate).Error; err != nil {
+		return 0, errors.New(500, "STAKE_RATE_SUM_ERROR", err.Error())
+	}
+
+	return totalStakeRate, nil
+}
+
+func (u *UserRepo) GetStakeGitRecordsQueue(ctx context.Context) ([]*biz.StakeGitRecordTwo, error) {
+	var (
+		records []*StakeGitRecordTwo
+	)
+
+	res := make([]*biz.StakeGitRecordTwo, 0)
+	instance := u.data.DB(ctx).Table("stake_git_record_ispay_queue")
+	instance = instance.Where("stake_type=?", 1).Limit(100)
+
+	if err := instance.Find(&records).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return res, nil
+		}
+		return nil, errors.New(500, "STAKE GIT RECORD ERROR", err.Error())
+	}
+
+	for _, record := range records {
+		res = append(res, &biz.StakeGitRecordTwo{
+			ID:          record.ID,
+			UserId:      record.UserId,
+			Amount:      record.Amount,
+			AmountTwo:   record.AmountTwo,
+			AmountThree: record.AmountThree,
+			StakeType:   record.StakeType,
+			CreatedAt:   record.CreatedAt,
+			UpdatedAt:   record.UpdatedAt,
+			Day:         record.Day,
 		})
 	}
 
@@ -4121,6 +4179,31 @@ func (u *UserRepo) SetStakeGetTotalSub(ctx context.Context, amount, balance floa
 		})
 	if res.Error != nil {
 		return errors.New(500, "SetStakeGetTotal", "用户信息修改失败")
+	}
+
+	return nil
+}
+
+func (u *UserRepo) SetStakeGitByQueue(ctx context.Context, id, userId uint64, amount, amountTwo float64, day uint64) error {
+	res := u.data.DB(ctx).Table("stake_git_record_ispay_queue").Where("id=?", id).
+		Updates(map[string]interface{}{
+			"stake_type": 2,
+			"updated_at": time.Now().Format("2006-01-02 15:04:05")})
+	if res.Error != nil || 1 != res.RowsAffected {
+		return errors.New(500, "SetStakeGet", "用户信息修改失败")
+	}
+
+	var stakeRecord StakeGitRecord
+
+	stakeRecord.Amount = amount
+	stakeRecord.AmountTwo = amountTwo
+	stakeRecord.UserId = userId
+	stakeRecord.StakeType = 1
+	stakeRecord.Day = day
+
+	res = u.data.DB(ctx).Table("stake_git_record_ispay").Create(&stakeRecord)
+	if res.Error != nil {
+		return errors.New(500, "SetStakeGetPlaySubQueue", "创建质押记录失败")
 	}
 
 	return nil
