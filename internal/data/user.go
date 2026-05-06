@@ -63,6 +63,7 @@ type User struct {
 	One              float64   `gorm:"type:decimal(65,20);not null"`
 	Two              float64   `gorm:"type:decimal(65,20);not null"`
 	Three            float64   `gorm:"type:decimal(65,20);not null"`
+	RecommendOne     uint64    `gorm:"type:int;"`
 }
 
 type UserRecommend struct {
@@ -1037,6 +1038,35 @@ func (u *UserRepo) GetUserById(ctx context.Context, id uint64) (*biz.User, error
 	}, nil
 }
 
+// NewRecommendReward .
+func (u *UserRepo) NewRecommendReward(ctx context.Context, userId, lowUserId uint64, amount, ispay float64) error {
+	if amount > 0 {
+		resTwo := u.data.DB(ctx).Table("user").Where("id=?", lowUserId).
+			Updates(map[string]interface{}{"recommend_one": 1, "updated_at": time.Now().Format("2006-01-02 15:04:05")})
+		if resTwo.Error != nil || 1 != resTwo.RowsAffected {
+			return errors.New(500, "PlantPlatTwoTwoLT", "用户信息修改失败")
+		}
+		res := u.data.DB(ctx).Table("user").Where("id=?", userId).
+			Updates(map[string]interface{}{"amount_usdt": gorm.Expr("amount_usdt + ?", amount), "git_new": gorm.Expr("git_new + ?", ispay), "reward_one": gorm.Expr("reward_one + ?", amount), "updated_at": time.Now().Format("2006-01-02 15:04:05")})
+		if res.Error != nil || 1 != res.RowsAffected {
+			return errors.New(500, "PlantPlatTwoTwoL", "用户信息修改失败")
+		}
+		var reward Reward
+
+		reward.Reason = 4
+		reward.UserId = userId
+		reward.Amount = amount
+		reward.Three = ispay
+		reward.One = lowUserId
+		resThree := u.data.DB(ctx).Table("reward").Create(&reward)
+		if resThree.Error != nil {
+			return errors.New(500, "PlantPlatTwoTwoL", "用户信息修改失败")
+		}
+	}
+
+	return nil
+}
+
 // GetUserByAddress .
 func (u *UserRepo) GetUserByAddress(ctx context.Context, address string) (*biz.User, error) {
 	var user *User
@@ -1083,6 +1113,7 @@ func (u *UserRepo) GetUserByAddress(ctx context.Context, address string) (*biz.U
 		OutNum:           user.OutNum,
 		Vip:              user.Vip,
 		VipAdmin:         user.VipAdmin,
+		RecommendOne:     user.RecommendOne,
 	}, nil
 }
 
