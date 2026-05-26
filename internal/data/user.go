@@ -4886,6 +4886,7 @@ func (u *UserRepo) GetStakeGitRecords(ctx context.Context) ([]*biz.StakeGitRecor
 
 	res := make([]*biz.StakeGitRecord, 0)
 	instance := u.data.DB(ctx).Table("stake_git_record_ispay").
+		Where("created_at>=?", time.Now().Add(-30*24*time.Hour)).
 		Where("stake_type=?", 1).
 		Order("id desc")
 
