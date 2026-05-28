@@ -5399,7 +5399,7 @@ func (ac *AppUsecase) AdminUserList(ctx context.Context, req *pb.AdminUserListRe
 		}
 		stakeGitAmountQueue := float64(0)
 		for _, vS := range stakeGitRecordQueue {
-			stakeGitAmount += vS.Amount
+			stakeGitAmountQueue += vS.Amount
 		}
 
 		var (
