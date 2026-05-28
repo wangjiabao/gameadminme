@@ -3080,6 +3080,9 @@ components:
                 myStakeGit:
                     type: number
                     format: double
+                myStakeGitQueue:
+                    type: number
+                    format: double
                 myStakeGetTotal:
                     type: number
                     format: double

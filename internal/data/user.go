@@ -4879,6 +4879,74 @@ func (u *UserRepo) UpdateConfig(ctx context.Context, id uint64, value string) er
 	return nil
 }
 
+func (u *UserRepo) GetStakeGitRecordsByUserIDIspay(ctx context.Context, userID uint64) ([]*biz.StakeGitRecord, error) {
+	var (
+		records []*StakeGitRecord
+	)
+
+	res := make([]*biz.StakeGitRecord, 0)
+	instance := u.data.DB(ctx).Table("stake_git_record_ispay").
+		Where("user_id=?", userID).
+		Where("created_at>=?", time.Now().Add(-30*24*time.Hour)).
+		Where("stake_type=?", 1).
+		Order("id desc")
+
+	if err := instance.Find(&records).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return res, nil
+		}
+		return nil, errors.New(500, "STAKE GIT RECORD ERROR", err.Error())
+	}
+
+	for _, record := range records {
+		res = append(res, &biz.StakeGitRecord{
+			ID:        record.ID,
+			UserId:    record.UserId,
+			Amount:    record.Amount,
+			StakeType: record.StakeType,
+			CreatedAt: record.CreatedAt,
+			UpdatedAt: record.UpdatedAt,
+			Day:       record.Day,
+		})
+	}
+
+	return res, nil
+}
+
+func (u *UserRepo) GetStakeGitRecordsByUserIDIspayQueue(ctx context.Context, userID uint64) ([]*biz.StakeGitRecord, error) {
+	var (
+		records []*StakeGitRecord
+	)
+
+	res := make([]*biz.StakeGitRecord, 0)
+	instance := u.data.DB(ctx).Table("stake_git_record_ispay_queue").
+		Where("user_id=?", userID).
+		Where("created_at>=?", time.Now().Add(-30*24*time.Hour)).
+		Where("stake_type=?", 1).
+		Order("id desc")
+
+	if err := instance.Find(&records).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return res, nil
+		}
+		return nil, errors.New(500, "STAKE GIT RECORD ERROR", err.Error())
+	}
+
+	for _, record := range records {
+		res = append(res, &biz.StakeGitRecord{
+			ID:        record.ID,
+			UserId:    record.UserId,
+			Amount:    record.Amount,
+			StakeType: record.StakeType,
+			CreatedAt: record.CreatedAt,
+			UpdatedAt: record.UpdatedAt,
+			Day:       record.Day,
+		})
+	}
+
+	return res, nil
+}
+
 func (u *UserRepo) GetStakeGitRecords(ctx context.Context) ([]*biz.StakeGitRecord, error) {
 	var (
 		records []*StakeGitRecord

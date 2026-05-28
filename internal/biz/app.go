@@ -620,6 +620,8 @@ type UserRepo interface {
 	GetPriceChange(ctx context.Context) ([]*PriceChange, error)
 	UpdatePriceChange(ctx context.Context, id uint64) error
 	GetStakeGitRecords(ctx context.Context) ([]*StakeGitRecord, error)
+	GetStakeGitRecordsByUserIDIspayQueue(ctx context.Context, userID uint64) ([]*StakeGitRecord, error)
+	GetStakeGitRecordsByUserIDIspay(ctx context.Context, userID uint64) ([]*StakeGitRecord, error)
 	DailyReward(ctx context.Context, id, userId uint64, amount float64) error
 	DailyRewardL(ctx context.Context, id, userId, lowUserId, num uint64, amount float64) error
 	CreateNotice(ctx context.Context, userId uint64, content string, contentTwo string) error
@@ -4963,7 +4965,7 @@ func (ac *AppUsecase) StakeGetPlay(ctx context.Context, address string, req *pb.
 		}
 
 		return &pb.StakeGetPlayReply{Status: "ok", PlayStatus: 1, Amount: tmpGit}, nil
-	} else {                                                         // 输：下注金额加入池子
+	} else { // 输：下注金额加入池子
 		if err = ac.tx.ExecTx(ctx, func(ctx context.Context) error { // 事务
 			err = ac.userRepo.SetStakeGetPlaySub(ctx, user.ID, float64(req.SendBody.Amount))
 			if nil != err {
@@ -5379,12 +5381,24 @@ func (ac *AppUsecase) AdminUserList(ctx context.Context, req *pb.AdminUserListRe
 		var (
 			stakeGitRecord []*StakeGitRecord
 		)
-		stakeGitRecord, err = ac.userRepo.GetStakeGitRecordsByUserID(ctx, v.ID, nil)
+		stakeGitRecord, err = ac.userRepo.GetStakeGitRecordsByUserIDIspay(ctx, v.ID)
 		if nil != err {
 			continue
 		}
 		stakeGitAmount := float64(0)
 		for _, vS := range stakeGitRecord {
+			stakeGitAmount += vS.Amount
+		}
+
+		var (
+			stakeGitRecordQueue []*StakeGitRecord
+		)
+		stakeGitRecordQueue, err = ac.userRepo.GetStakeGitRecordsByUserIDIspayQueue(ctx, v.ID)
+		if nil != err {
+			continue
+		}
+		stakeGitAmountQueue := float64(0)
+		for _, vS := range stakeGitRecordQueue {
 			stakeGitAmount += vS.Amount
 		}
 
@@ -5426,6 +5440,7 @@ func (ac *AppUsecase) AdminUserList(ctx context.Context, req *pb.AdminUserListRe
 			RecommendTotalRewardThree: v.RewardThree,
 			MyStakeGit:                stakeGitAmount,
 			MyStakeGetTotal:           stakeGetTotalMy,
+			MyStakeGitQueue:           stakeGitAmountQueue,
 			AmountUsdt:                v.AmountUsdt,
 			Lock:                      v.LockUse,
 			LockReward:                v.LockReward,
