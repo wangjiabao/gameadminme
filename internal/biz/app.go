@@ -6267,6 +6267,7 @@ func (ac *AppUsecase) AdminGetConfig(ctx context.Context, req *pb.AdminGetConfig
 		"exchange_stake_rate",
 		"queue_amount",
 		"one_rate_new",
+		"stake_rate_new",
 	)
 	if nil != err || nil == configs {
 		return &pb.AdminGetConfigReply{
